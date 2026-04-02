@@ -1,0 +1,11 @@
+# Personal data — never commit these
+daystack.db
+daystack.db-shm
+daystack.db-wal
+.daystack-window.json
+
+# macOS system files
+.DS_Store
+
+# Compiled app — users build this themselves
+DayStack.app/
