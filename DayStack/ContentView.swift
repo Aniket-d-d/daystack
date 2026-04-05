@@ -66,7 +66,11 @@ struct ContentView: View {
                         }
 
                     case .all:
-                        AllTasksView()
+                        AllTasksView(onNavigateToDate: { date in
+                            selectedDate = date
+                            currentView  = .tasks
+                            store.loadTasks(for: date)
+                        })
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

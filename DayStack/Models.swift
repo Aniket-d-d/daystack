@@ -3,12 +3,25 @@ import SwiftUI
 // MARK: - Task Model
 
 struct Task: Identifiable, Equatable, Hashable {
-    let id:         Int64
-    var title:      String
-    var notes:      String
-    var completed:  Bool
-    var orderIndex: Int
-    var date:       String   // "yyyy-MM-dd"
+    let id:            Int64
+    var title:         String
+    var notes:         String
+    var completed:     Bool
+    var completedDate: String   // "yyyy-MM-dd" or ""
+    var orderIndex:    Int
+    var date:          String   // "yyyy-MM-dd"
+    var isFootprint:   Bool     // true = was carried forward, original stays as dim marker
+    var forwardedToId: Int64    // ID of task it was carried to (0 if none)
+    var chainId:       Int64    // shared across all carry-forward copies of the same task
+}
+
+// MARK: - Task History Entry
+
+struct TaskHistoryEntry: Identifiable {
+    let id:       Int64
+    let taskId:   Int64
+    let fromDate: String
+    let toDate:   String
 }
 
 // MARK: - Date Utilities
@@ -29,8 +42,8 @@ func strToDate(_ s: String) -> Date {
 
 func addDays(_ s: String, _ n: Int) -> String {
     let d = strToDate(s)
-    guard let result = Calendar.current.date(byAdding: .day, value: n, to: d) else { return s }
-    return dateToStr(result)
+    guard let r = Calendar.current.date(byAdding: .day, value: n, to: d) else { return s }
+    return dateToStr(r)
 }
 
 func formatHeader(_ s: String) -> String {
@@ -45,24 +58,31 @@ func formatDateLabel(_ s: String) -> String {
     return f.string(from: strToDate(s))
 }
 
+func formatShortDate(_ s: String) -> String {
+    let f = DateFormatter()
+    f.dateFormat = "EEE dd MMM"
+    return f.string(from: strToDate(s))
+}
+
 // MARK: - Color Palette
 
 extension Color {
-    static let dsBackground = Color(red: 0.043, green: 0.047, blue: 0.063)
-    static let dsSurface    = Color(red: 0.075, green: 0.078, blue: 0.102)
-    static let dsInput      = Color(red: 0.055, green: 0.059, blue: 0.079)
-    static let dsBorder     = Color.white.opacity(0.06)
+    static let dsBackground   = Color(red: 0.043, green: 0.047, blue: 0.063)
+    static let dsSurface      = Color(red: 0.075, green: 0.078, blue: 0.102)
+    static let dsInput        = Color(red: 0.055, green: 0.059, blue: 0.079)
+    static let dsBorder       = Color.white.opacity(0.06)
 
-    static let dsAccent     = Color(red: 0.133, green: 0.827, blue: 0.933) // cyan
-    static let dsAccentDim  = Color(red: 0.133, green: 0.827, blue: 0.933).opacity(0.12)
+    static let dsAccent       = Color(red: 0.133, green: 0.827, blue: 0.933)
+    static let dsAccentDim    = Color(red: 0.133, green: 0.827, blue: 0.933).opacity(0.12)
     static let dsAccentBorder = Color(red: 0.133, green: 0.827, blue: 0.933).opacity(0.35)
 
-    static let dsText       = Color.white
-    static let dsTextMuted  = Color.white.opacity(0.82)
-    static let dsTextDim    = Color.white.opacity(0.65)
+    static let dsText         = Color.white
+    static let dsTextMuted    = Color.white.opacity(0.82)
+    static let dsTextDim      = Color.white.opacity(0.65)
 
-    static let dsGreen      = Color(red: 0.204, green: 0.827, blue: 0.600)
-    static let dsRed        = Color(red: 0.973, green: 0.443, blue: 0.443)
+    static let dsGreen        = Color(red: 0.204, green: 0.827, blue: 0.600)
+    static let dsRed          = Color(red: 0.973, green: 0.443, blue: 0.443)
+    static let dsAmber        = Color(red: 0.984, green: 0.749, blue: 0.141)
 }
 
 // MARK: - Shared Button Style
@@ -81,10 +101,7 @@ struct DSTinyButton: ButtonStyle {
                     .fill(active ? Color.dsAccentDim : Color.dsSurface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 5)
-                            .stroke(
-                                active ? Color.dsAccentBorder : Color.dsBorder,
-                                lineWidth: 1
-                            )
+                            .stroke(active ? Color.dsAccentBorder : Color.dsBorder, lineWidth: 1)
                     )
             )
             .opacity(configuration.isPressed ? 0.7 : 1)

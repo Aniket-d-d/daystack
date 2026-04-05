@@ -20,35 +20,63 @@ DayStack is a lightweight task widget that lives on your Mac desktop — behind 
 ## Preview
 
 ```
-┌─────────────────────────────────┐
-│  Month  Mo Tu We Th Fr Sa  All  │
-│  ────────────────────────────── │
-│  THU · 02 APR 2026              │
-│                                 │
-│  ○  Design the homepage         │
-│  ○  Call with Raj @ 3pm         │
-│  ✓  Review pull request #42     │
-│                                 │
-│  ┌ ─ ─ + Add Task ─ ─ ─ ─ ─ ┐  │
-└─────────────────────────────────┘
+┌──────────────────────────────────────┐
+│  Month  Mo Tu We Th Fr Sa Su   All   │
+│  ────────────────────────────────── │
+│  THU · 02 APR 2026                   │
+│                                      │
+│  ○  Design the homepage              │
+│  ○  Call with Raj @ 3pm              │
+│  ✓  Review pull request #42          │
+│  ↩  YCombinator form       carry forwarded  │
+│                                      │
+│  ┌ ─ ─ + Add Task ─ ─ ─ ─ ┐  ↩     │
+└──────────────────────────────────────┘
 ```
 
 ---
 
 ## Features
 
+### Daily View
 - **Week strip** — 7 days centred on today, click any day to switch
-- **Month calendar** — opens inline with red dots on days with incomplete tasks
-- **All Tasks view** — every task ever, filterable by All / Incomplete / Completed
-- **Inline editing** — click any task title to rename it
-- **Notes** — expand any task to add free-form notes or subtasks
-- **Drag to reorder** — drag handle on hover to rearrange tasks
+- **Month calendar** — opens inline with red dots on days that have incomplete tasks. Click any date to jump to it.
+- **All Tasks view** — every task ever recorded, filterable by All / Incomplete / Completed
+- **Inline editing** — click any task title to rename it, on any date including past days
+- **Notes** — click `›` on any task to expand a free-form notes area. Auto-saves.
+- **Drag to reorder** — drag handle appears on hover to rearrange tasks within the day
 - **Hover to delete** — `✕` appears on hover
-- **Past days** — view history, check/uncheck old tasks, read notes
-- **Draggable & resizable** — position and size it however you like
-- **Remembers position** — widget stays where you put it across restarts
-- **Auto-launches on login** — starts with your Mac automatically
-- **Hides behind apps** — sits on the desktop layer, never in the way
+- **Past days** — fully viewable. Check/uncheck tasks and edit titles and notes on any past date.
+
+### Carry Forward
+- **`↩` button** next to Add Task — opens a sheet of all incomplete tasks from previous days, grouped by date
+- Click **`+ Add`** on any task to copy it to today. The original stays on its date, dimmed, marked as carry forwarded.
+- Carry forwarded tasks show as a dim amber marker on their original date — not counted as incomplete, not shown in the Incomplete filter, and not triggering the red dot on the calendar.
+- **Linked renaming** — rename a task on any date and the update propagates to every copy of that task across all carry-forward dates automatically.
+- **Smart deletion** — deleting a carried task only removes it from that date forward. The previous copy is automatically restored as a live incomplete task.
+- **Full history log** — expand any carried task to see every date it passed through:
+
+```
+── History
+◎ Created    Mon 31 Mar
+↩ Carried    Wed 02 Apr
+↩ Carried    Fri 04 Apr
+✓ Completed  Fri 04 Apr
+```
+
+### All Tasks View
+- Groups all tasks by date, newest first
+- Filter by **All / Incomplete / Completed**
+- Footprint rows (carry forwarded markers) shown in amber — click any footprint to jump to the date where the task currently lives
+- Expand any task to see its notes and carry-forward history
+
+### Window
+- Sits on the **desktop layer** — behind all app windows, always visible on the desktop
+- **Draggable** anywhere on screen — click and drag the widget body
+- **Resizable** — drag any edge or corner. Minimum 220×300, maximum 600×900.
+- **Remembers position and size** across restarts
+- **Auto-launches on login** — starts with your Mac automatically after first build
+- **Right-click** anywhere on the widget → Quit DayStack
 
 ---
 
@@ -60,7 +88,7 @@ DayStack is a lightweight task widget that lives on your Mac desktop — behind 
 | SQLite3 | Local database | Apple (built into macOS) |
 | AppKit (NSPanel) | Floating window | Apple |
 
-No external libraries. No internet connection. No telemetry.  
+No external libraries. No internet connection. No telemetry.
 Security patches come automatically with macOS — you do nothing.
 
 ---
@@ -85,7 +113,7 @@ A popup appears — click Install. Takes a few minutes.
 **Step 2 — Clone and build**
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/daystack.git
+git clone https://github.com/Aniket-d-d/daystack.git
 cd daystack
 ./build.sh
 ```
@@ -94,7 +122,7 @@ The script compiles everything, produces `DayStack.app`, and registers it as a l
 
 **Step 3 — Open it**
 
-Right-click `DayStack.app` → **Open** → **Open**  
+Right-click `DayStack.app` → **Open** → **Open**
 *(macOS asks once because the app is not from the App Store — after that it opens normally)*
 
 ---
@@ -112,7 +140,7 @@ daystack/
 └── DayStack/              ← Swift source files
 ```
 
-To **back up** your tasks: copy `daystack.db`  
+To **back up** your tasks: copy `daystack.db`
 To **uninstall** completely: delete the `daystack` folder
 
 ---
@@ -125,9 +153,9 @@ DayStack/
 ├── Models.swift         — Task model, date utilities, colour palette
 ├── TaskStore.swift      — all SQLite database operations
 ├── ContentView.swift    — main widget shell, navigation, week strip
-├── TasksView.swift      — daily task list, inline editing, add task
+├── TasksView.swift      — daily task list, inline editing, add task, carry forward
 ├── CalendarView.swift   — month calendar with incomplete task dots
-└── AllTasksView.swift   — all tasks view with filter toggles
+└── AllTasksView.swift   — all tasks view with filters and footprint navigation
 ```
 
 ---
@@ -144,7 +172,7 @@ If DayStack is useful to you, consider sponsoring — it helps keep the project 
 
 ## License
 
-MIT © 2026 [Aniket-d-d]
+MIT © 2026 Aniket-d-d
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 

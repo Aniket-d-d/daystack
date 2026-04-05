@@ -3,15 +3,16 @@ import SwiftUI
 // MARK: - TasksView
 
 struct TasksView: View {
-    @EnvironmentObject var store:  TaskStore
+    @EnvironmentObject var store: TaskStore
     let selectedDate: String
     let today:        String
 
-    @State private var editingId:    Int64? = nil
-    @State private var editingTitle: String = ""
-    @State private var expandedId:   Int64? = nil
-    @State private var isAdding:     Bool   = false
-    @State private var newTitle:     String = ""
+    @State private var editingId:        Int64?  = nil
+    @State private var editingTitle:     String  = ""
+    @State private var expandedId:       Int64?  = nil
+    @State private var isAdding:         Bool    = false
+    @State private var newTitle:         String  = ""
+    @State private var showCarryForward: Bool    = false
     @FocusState private var addFieldFocused: Bool
 
     var isPast: Bool { selectedDate < today }
@@ -30,15 +31,14 @@ struct TasksView: View {
             .padding(.top, 8)
             .padding(.bottom, 6)
 
-            // Scrollable task list
+            // Task list
             List {
                 ForEach(store.tasks) { task in
                     TaskRowView(
-                        task:         task,
-                        isPast:       isPast,
-                        isExpanded:   expandedId == task.id,
-                        isEditing:    editingId  == task.id,
-                        editingTitle: editingId  == task.id ? $editingTitle : .constant(""),
+                        task:          task,
+                        isExpanded:    expandedId == task.id,
+                        isEditing:     editingId  == task.id,
+                        editingTitle:  editingId  == task.id ? $editingTitle : .constant(""),
                         onToggle:        { toggle(task) },
                         onTapTitle:      { startEdit(task) },
                         onSaveTitle:     { saveTitle(task) },
@@ -58,7 +58,6 @@ struct TasksView: View {
                     store.reorderTasks(t)
                 }
 
-                // Empty state
                 if store.tasks.isEmpty {
                     Text(isPast ? "Nothing recorded." : "No tasks yet.")
                         .font(.system(size: 12, design: .monospaced))
@@ -72,7 +71,7 @@ struct TasksView: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
 
-            // Add task area — only for today and future
+            // Bottom action area — only for today
             if !isPast {
                 Rectangle()
                     .fill(Color.dsBorder)
@@ -82,42 +81,65 @@ struct TasksView: View {
                 if isAdding {
                     addTaskField
                 } else {
-                    addTaskButton
+                    bottomActions
                 }
             }
         }
         .onAppear {
             store.loadTasks(for: selectedDate)
         }
+        // Carry Forward sheet
+        .sheet(isPresented: $showCarryForward) {
+            CarryForwardSheet(today: today, isPresented: $showCarryForward)
+                .environmentObject(store)
+        }
     }
 
-    // MARK: - Add Task UI
+    // MARK: - Bottom Actions (Add + Carry Forward)
 
-    var addTaskButton: some View {
-        Button {
-            isAdding  = true
-            newTitle  = ""
-            addFieldFocused = true
-        } label: {
-            HStack {
-                Spacer()
+    var bottomActions: some View {
+        HStack(spacing: 6) {
+            // + Add Task
+            Button {
+                isAdding        = true
+                newTitle        = ""
+                addFieldFocused = true
+            } label: {
                 Text("+ Add Task")
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundColor(.dsTextDim)
-                    .tracking(0.5)
-                Spacer()
-            }
-            .padding(.vertical, 7)
-            .overlay(
-                RoundedRectangle(cornerRadius: 7)
-                    .stroke(
-                        Color.dsTextDim,
-                        style: StrokeStyle(lineWidth: 1, dash: [4])
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7)
+                            .stroke(Color.dsTextDim,
+                                    style: StrokeStyle(lineWidth: 1, dash: [4]))
                     )
-            )
-            .contentShape(Rectangle())
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            // ↩ Carry Forward
+            Button {
+                store.loadIncompleteOldTasks(before: today)
+                showCarryForward = true
+            } label: {
+                Text("↩")
+                    .font(.system(size: 14, design: .monospaced))
+                    .foregroundColor(.dsAmber)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7)
+                            .fill(Color.dsAmber.opacity(0.12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 7)
+                                    .stroke(Color.dsAmber.opacity(0.35), lineWidth: 1)
+                            )
+                    )
+            }
+            .buttonStyle(.plain)
+            .help("Carry forward incomplete tasks from previous days")
         }
-        .buttonStyle(.plain)
         .padding(.horizontal, 6)
         .padding(.vertical, 6)
     }
@@ -129,7 +151,7 @@ struct TasksView: View {
                 .font(.system(size: 13, design: .monospaced))
                 .foregroundColor(.dsAccent)
                 .focused($addFieldFocused)
-                .onSubmit   { commitNew() }
+                .onSubmit      { commitNew() }
                 .onExitCommand { cancelNew() }
 
             Button("✕") { cancelNew() }
@@ -154,12 +176,14 @@ struct TasksView: View {
     // MARK: - Actions
 
     func toggle(_ task: Task) {
-        var t = task; t.completed.toggle()
+        var t = task
+        t.completed.toggle()
+        t.completedDate = t.completed ? todayStr() : ""
         store.updateTask(t)
     }
 
     func startEdit(_ task: Task) {
-        guard !isPast else { return }
+        // Editing now allowed on all dates including past
         editingId    = task.id
         editingTitle = task.title
     }
@@ -167,8 +191,8 @@ struct TasksView: View {
     func saveTitle(_ task: Task) {
         let v = editingTitle.trimmingCharacters(in: .whitespaces)
         if !v.isEmpty {
-            var t = task; t.title = v
-            store.updateTask(t)
+            // Update title across the entire carry-forward chain
+            store.updateTitleInChain(chainId: task.chainId, newTitle: v)
         }
         editingId = nil
     }
@@ -201,7 +225,6 @@ struct TasksView: View {
 
 struct TaskRowView: View {
     let task:         Task
-    let isPast:       Bool
     let isExpanded:   Bool
     let isEditing:    Bool
     @Binding var editingTitle: String
@@ -214,15 +237,52 @@ struct TaskRowView: View {
     let onDelete:       () -> Void
     let onUpdateNotes:  (String) -> Void
 
+    @EnvironmentObject var store: TaskStore
     @State private var isHovered: Bool             = false
     @State private var notes:     String           = ""
     @State private var saveWork:  DispatchWorkItem? = nil
+    @State private var history:   [TaskHistoryEntry] = []
 
     var body: some View {
+        if task.isFootprint {
+            footprintView
+        } else {
+            activeView
+        }
+    }
+
+    // Read-only dim row for carried-forward tasks on their original date
+    var footprintView: some View {
+        HStack(spacing: 8) {
+            Text("↩")
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundColor(.dsAmber.opacity(0.6))
+                .frame(width: 14, alignment: .center)
+            Text(task.title)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundColor(.dsAmber.opacity(0.45))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("carry forwarded")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor(.dsAmber.opacity(0.4))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.dsAmber.opacity(0.08))
+                        .overlay(RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color.dsAmber.opacity(0.15), lineWidth: 1))
+                )
+        }
+        .padding(.vertical, 5)
+        .padding(.horizontal, 5)
+    }
+
+    var activeView: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Main row
             HStack(spacing: 5) {
-                // Check / uncheck
+                // Check
                 Button { onToggle() } label: {
                     Text(task.completed ? "✓" : "○")
                         .font(.system(size: 13, design: .monospaced))
@@ -231,7 +291,7 @@ struct TaskRowView: View {
                 }
                 .buttonStyle(.plain)
 
-                // Title — TextField when editing, Text otherwise
+                // Title — always editable
                 if isEditing {
                     TextField("", text: $editingTitle)
                         .textFieldStyle(.plain)
@@ -248,7 +308,7 @@ struct TaskRowView: View {
                         .onTapGesture { onTapTitle() }
                 }
 
-                // Expand (notes) button
+                // Expand button
                 Button { onToggleExpand() } label: {
                     Text("›")
                         .font(.system(size: 15, design: .monospaced))
@@ -259,7 +319,7 @@ struct TaskRowView: View {
                 .buttonStyle(.plain)
                 .opacity(isHovered || isExpanded ? 1 : 0)
 
-                // Delete (on hover, not while editing)
+                // Delete
                 if isHovered && !isEditing {
                     Button { onDelete() } label: {
                         Text("✕")
@@ -276,38 +336,210 @@ struct TaskRowView: View {
                     .fill(isHovered || isExpanded ? Color.dsSurface : Color.clear)
             )
 
-            // Notes text area (expanded)
+            // Expanded: notes + history
             if isExpanded {
-                TextEditor(text: $notes)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(.dsTextMuted)
-                    .scrollContentBackground(.hidden)
-                    .background(Color.dsInput)
-                    .cornerRadius(5)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 5)
-                            .stroke(Color.dsBorder, lineWidth: 1)
-                    )
-                    .frame(minHeight: 60, maxHeight: 90)
-                    .padding(.leading, 26)
-                    .padding(.trailing,  5)
-                    .padding(.bottom,    6)
-                    .onAppear {
-                        notes = task.notes
+                VStack(alignment: .leading, spacing: 6) {
+                    // Notes
+                    TextEditor(text: $notes)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(.dsTextMuted)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.dsInput)
+                        .cornerRadius(5)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5)
+                                .stroke(Color.dsBorder, lineWidth: 1)
+                        )
+                        .frame(minHeight: 54, maxHeight: 90)
+                        .onChange(of: notes) { newVal in
+                            saveWork?.cancel()
+                            let work = DispatchWorkItem { onUpdateNotes(newVal) }
+                            saveWork = work
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: work)
+                        }
+
+                    // History — only shown if task has carry forward entries
+                    if !history.isEmpty {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("── History")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(.dsTextDim)
+
+                            // First entry shows original creation date
+                            if let first = history.first {
+                                historyRow(icon: "◎", label: "Created", date: first.fromDate, color: .dsTextDim)
+                            }
+
+                            // Each carry forward
+                            ForEach(history) { entry in
+                                historyRow(icon: "↩", label: "Carried", date: entry.toDate, color: .dsAmber)
+                            }
+
+                            // Completion date if done
+                            if task.completed && !task.completedDate.isEmpty {
+                                historyRow(icon: "✓", label: "Completed", date: task.completedDate, color: .dsGreen)
+                            }
+                        }
+                        .padding(.top, 2)
                     }
-                    .onChange(of: notes) { newVal in
-                        // Debounce: save 1s after last keystroke
-                        saveWork?.cancel()
-                        let work = DispatchWorkItem { onUpdateNotes(newVal) }
-                        saveWork = work
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: work)
-                    }
+                }
+                .padding(.leading, 22)
+                .padding(.trailing,  5)
+                .padding(.bottom,    6)
+                .onAppear {
+                    notes   = task.notes
+                    history = store.loadHistory(for: task.id)
+                }
             }
         }
         .onHover { isHovered = $0 }
-        // Sync local title state when editing starts
         .onChange(of: isEditing) { editing in
             if editing { editingTitle = task.title }
         }
+    }
+
+    @ViewBuilder
+    func historyRow(icon: String, label: String, date: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Text(icon)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(color)
+                .frame(width: 12, alignment: .center)
+            Text("\(label)  \(formatShortDate(date))")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(color.opacity(0.85))
+        }
+    }
+}
+
+// MARK: - Carry Forward Sheet
+
+struct CarryForwardSheet: View {
+    @EnvironmentObject var store: TaskStore
+    let today: String
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("↩  Carry Forward")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(.dsAccent)
+                    .tracking(1)
+                Spacer()
+                Button("✕") { isPresented = false }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.dsTextDim)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+
+            Rectangle()
+                .fill(Color.dsBorder)
+                .frame(height: 1)
+
+            if store.incompleteOldTasks.isEmpty {
+                Text("No incomplete tasks from previous days.")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.dsTextDim)
+                    .multilineTextAlignment(.center)
+                    .padding(24)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(store.incompleteOldTasks, id: \.0) { (date, tasks) in
+                            // Date group header
+                            Text(formatDateLabel(date))
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(.dsTextDim)
+                                .tracking(0.8)
+                                .padding(.horizontal, 14)
+                                .padding(.top, 10)
+                                .padding(.bottom, 4)
+
+                            ForEach(tasks) { task in
+                                CarryForwardRow(task: task, today: today) {
+                                    store.carryForward(task: task, toDate: today)
+                                }
+                            }
+
+                            Rectangle()
+                                .fill(Color.dsBorder)
+                                .frame(height: 1)
+                                .padding(.horizontal, 10)
+                                .padding(.top, 6)
+                        }
+                    }
+                    .padding(.bottom, 10)
+                }
+            }
+        }
+        .frame(width: 290, height: 380)
+        .background(Color.dsBackground.opacity(0.98))
+    }
+}
+
+// MARK: - CarryForwardRow
+
+struct CarryForwardRow: View {
+    let task:    Task
+    let today:   String
+    let onAdd:   () -> Void
+
+    @State private var added:     Bool = false
+    @State private var isHovered: Bool = false
+
+    // Check if this task is already added to today
+    @EnvironmentObject var store: TaskStore
+
+    var alreadyAdded: Bool {
+        store.tasks.contains { $0.title == task.title && $0.date == today }
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("○")
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundColor(.dsTextDim)
+                .frame(width: 14, alignment: .center)
+
+            Text(task.title)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundColor(added || alreadyAdded ? .dsTextDim : .dsText)
+                .strikethrough(added || alreadyAdded)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if added || alreadyAdded {
+                Text("Added")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.dsGreen)
+            } else {
+                Button {
+                    onAdd()
+                    added = true
+                } label: {
+                    Text("+ Add")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.dsAccent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(Color.dsAccentDim)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 5)
+                                        .stroke(Color.dsAccentBorder, lineWidth: 1)
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(isHovered ? Color.dsSurface : Color.clear)
+        .onHover { isHovered = $0 }
     }
 }
