@@ -28,7 +28,7 @@ DayStack is a lightweight task widget that lives on your Mac desktop — behind 
 │  ○  Design the homepage              │
 │  ○  Call with Raj @ 3pm              │
 │  ✓  Review pull request #42          │
-│  ↩  YCombinator form       carry forwarded  │
+│  ↩  YCombinator form    carry forwarded  │
 │                                      │
 │  ┌ ─ ─ + Add Task ─ ─ ─ ─ ┐  ↩     │
 └──────────────────────────────────────┘
@@ -42,18 +42,19 @@ DayStack is a lightweight task widget that lives on your Mac desktop — behind 
 - **Week strip** — 7 days centred on today, click any day to switch
 - **Month calendar** — opens inline with red dots on days that have incomplete tasks. Click any date to jump to it.
 - **All Tasks view** — every task ever recorded, filterable by All / Incomplete / Completed
-- **Inline editing** — click any task title to rename it, on any date including past days
+- **Inline editing** — click any task title to rename it on any date
 - **Notes** — click `›` on any task to expand a free-form notes area. Auto-saves.
 - **Drag to reorder** — drag handle appears on hover to rearrange tasks within the day
 - **Hover to delete** — `✕` appears on hover
-- **Past days** — fully viewable. Check/uncheck tasks and edit titles and notes on any past date.
+- **Any date** — add tasks, carry forward, check/uncheck, and edit titles and notes on any past or future date
 
 ### Carry Forward
-- **`↩` button** next to Add Task — opens a sheet of all incomplete tasks from previous days, grouped by date
-- Click **`+ Add`** on any task to copy it to today. The original stays on its date, dimmed, marked as carry forwarded.
+- **`↩` button** next to Add Task — opens a sheet of all incomplete tasks from previous dates, grouped by date
+- Click **`+ Add`** on any task to copy it to the selected date. The original stays on its date, dimmed, marked as carry forwarded.
 - Carry forwarded tasks show as a dim amber marker on their original date — not counted as incomplete, not shown in the Incomplete filter, and not triggering the red dot on the calendar.
 - **Linked renaming** — rename a task on any date and the update propagates to every copy of that task across all carry-forward dates automatically.
 - **Smart deletion** — deleting a carried task only removes it from that date forward. The previous copy is automatically restored as a live incomplete task.
+- **Completion date accuracy** — completing a task stamps the date of the view you are on, not today's date. Completing a task on April 5th's view records April 5th.
 - **Full history log** — expand any carried task to see every date it passed through:
 
 ```
@@ -65,6 +66,7 @@ DayStack is a lightweight task widget that lives on your Mac desktop — behind 
 ```
 
 ### All Tasks View
+- Read-only — browse and reference tasks and their history. No editing or completing from this view.
 - Groups all tasks by date, newest first
 - Filter by **All / Incomplete / Completed**
 - Footprint rows (carry forwarded markers) shown in amber — click any footprint to jump to the date where the task currently lives
