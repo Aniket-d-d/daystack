@@ -117,21 +117,10 @@ struct AllTasksView: View {
                         let realForDate = grouped.first(where: { $0.0 == date })?.1 ?? []
                         ForEach(realForDate) { task in
                             AllTaskRow(
-                                task:           task,
-                                isExpanded:     expandedId == task.id,
-                                onToggle: {
-                                    var t = task
-                                    t.completed.toggle()
-                                    t.completedDate = t.completed ? todayStr() : ""
-                                    store.updateTask(t)
-                                    store.loadAllTasks()  // refresh so display date updates
-                                },
+                                task:       task,
+                                isExpanded: expandedId == task.id,
                                 onToggleExpand: {
                                     expandedId = expandedId == task.id ? nil : task.id
-                                },
-                                onUpdateNotes: { notes in
-                                    var t = task; t.notes = notes
-                                    store.updateTask(t)
                                 }
                             )
                         }
@@ -213,31 +202,25 @@ struct FootprintRow: View {
     }
 }
 
-// MARK: - AllTaskRow
+// MARK: - AllTaskRow (read-only)
 
 struct AllTaskRow: View {
     let task:           Task
     let isExpanded:     Bool
-    let onToggle:       () -> Void
     let onToggleExpand: () -> Void
-    let onUpdateNotes:  (String) -> Void
 
     @EnvironmentObject var store: TaskStore
     @State private var isHovered: Bool               = false
-    @State private var notes:     String             = ""
-    @State private var saveWork:  DispatchWorkItem?  = nil
     @State private var history:   [TaskHistoryEntry] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 5) {
-                Button { onToggle() } label: {
-                    Text(task.completed ? "✓" : "○")
-                        .font(.system(size: 13, design: .monospaced))
-                        .foregroundColor(task.completed ? .dsGreen : .dsTextMuted)
-                        .frame(width: 16, alignment: .center)
-                }
-                .buttonStyle(.plain)
+                // Status icon — read only, no tap
+                Text(task.completed ? "✓" : "○")
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundColor(task.completed ? .dsGreen : .dsTextMuted)
+                    .frame(width: 16, alignment: .center)
 
                 Text(task.title)
                     .font(.system(size: 13, design: .monospaced))
@@ -245,6 +228,7 @@ struct AllTaskRow: View {
                     .strikethrough(task.completed, color: .dsTextDim)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
+                // Expand for notes + history
                 Button { onToggleExpand() } label: {
                     Text("›")
                         .font(.system(size: 15, design: .monospaced))
@@ -262,23 +246,22 @@ struct AllTaskRow: View {
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 6) {
-                    // Notes
-                    TextEditor(text: $notes)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundColor(.dsTextMuted)
-                        .scrollContentBackground(.hidden)
-                        .background(Color.dsInput)
-                        .cornerRadius(5)
-                        .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.dsBorder, lineWidth: 1))
-                        .frame(minHeight: 54, maxHeight: 90)
-                        .onChange(of: notes) { newVal in
-                            saveWork?.cancel()
-                            let work = DispatchWorkItem { onUpdateNotes(newVal) }
-                            saveWork = work
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: work)
-                        }
+                    // Notes — read only
+                    if !task.notes.isEmpty {
+                        Text(task.notes)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(.dsTextMuted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 5)
+                                    .fill(Color.dsInput)
+                                    .overlay(RoundedRectangle(cornerRadius: 5)
+                                        .stroke(Color.dsBorder, lineWidth: 1))
+                            )
+                    }
 
-                    // History — only for tasks with carry forward entries
+                    // History — only for carried forward tasks
                     if !history.isEmpty {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("── History")
@@ -301,7 +284,6 @@ struct AllTaskRow: View {
                 .padding(.trailing, 12)
                 .padding(.bottom,    6)
                 .onAppear {
-                    notes   = task.notes
                     history = store.loadHistory(for: task.id)
                 }
             }

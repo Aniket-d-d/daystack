@@ -59,7 +59,7 @@ struct TasksView: View {
                 }
 
                 if store.tasks.isEmpty {
-                    Text(isPast ? "Nothing recorded." : "No tasks yet.")
+                    Text("No tasks yet.")
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundColor(.dsTextDim)
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -71,18 +71,16 @@ struct TasksView: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
 
-            // Bottom action area — only for today
-            if !isPast {
-                Rectangle()
-                    .fill(Color.dsBorder)
-                    .frame(height: 1)
-                    .padding(.horizontal, 8)
+            // Bottom action area — available on all dates
+            Rectangle()
+                .fill(Color.dsBorder)
+                .frame(height: 1)
+                .padding(.horizontal, 8)
 
-                if isAdding {
-                    addTaskField
-                } else {
-                    bottomActions
-                }
+            if isAdding {
+                addTaskField
+            } else {
+                bottomActions
             }
         }
         .onAppear {
@@ -90,7 +88,7 @@ struct TasksView: View {
         }
         // Carry Forward sheet
         .sheet(isPresented: $showCarryForward) {
-            CarryForwardSheet(today: today, isPresented: $showCarryForward)
+            CarryForwardSheet(targetDate: selectedDate, isPresented: $showCarryForward)
                 .environmentObject(store)
         }
     }
@@ -121,7 +119,7 @@ struct TasksView: View {
 
             // ↩ Carry Forward
             Button {
-                store.loadIncompleteOldTasks(before: today)
+                store.loadIncompleteOldTasks(before: selectedDate)
                 showCarryForward = true
             } label: {
                 Text("↩")
@@ -178,7 +176,7 @@ struct TasksView: View {
     func toggle(_ task: Task) {
         var t = task
         t.completed.toggle()
-        t.completedDate = t.completed ? todayStr() : ""
+        t.completedDate = t.completed ? selectedDate : ""
         store.updateTask(t)
     }
 
@@ -416,7 +414,7 @@ struct TaskRowView: View {
 
 struct CarryForwardSheet: View {
     @EnvironmentObject var store: TaskStore
-    let today: String
+    let targetDate: String   // the date we are carrying tasks INTO
     @Binding var isPresented: Bool
 
     var body: some View {
@@ -460,8 +458,8 @@ struct CarryForwardSheet: View {
                                 .padding(.bottom, 4)
 
                             ForEach(tasks) { task in
-                                CarryForwardRow(task: task, today: today) {
-                                    store.carryForward(task: task, toDate: today)
+                                CarryForwardRow(task: task, today: targetDate) {
+                                    store.carryForward(task: task, toDate: targetDate)
                                 }
                             }
 
@@ -484,14 +482,13 @@ struct CarryForwardSheet: View {
 // MARK: - CarryForwardRow
 
 struct CarryForwardRow: View {
-    let task:    Task
-    let today:   String
-    let onAdd:   () -> Void
+    let task:       Task
+    let today:      String   // targetDate — the date we are carrying into
+    let onAdd:      () -> Void
 
     @State private var added:     Bool = false
     @State private var isHovered: Bool = false
 
-    // Check if this task is already added to today
     @EnvironmentObject var store: TaskStore
 
     var alreadyAdded: Bool {
